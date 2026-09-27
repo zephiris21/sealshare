@@ -1,23 +1,30 @@
 /*
   X-Robots-Tag: noindex, nofollow
-  Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
 
+# 열쇠가 주소(# 뒤)에 있는 페이지 — 밖으로 어디서 왔는지 알리지 않는다
 /
   X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
 
 /viewer
   X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
 
 /me
   X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
   Cache-Control: no-cache
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 
 /admin
   X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
   Cache-Control: no-cache
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 
+# 공유된 HTML 이 도는 틀 — 브라우저 기본값(출처만 알린다: https://frame.sealshare.pages.dev/).
+# no-referrer 로 두면 유튜브 임베드가 「오류 153」으로 안 열린다(2026-09-27 실측). 이 주소에는 문서 번호도 열쇠도 없다.
 /frame
+  Referrer-Policy: strict-origin-when-cross-origin
   Content-Security-Policy: frame-ancestors https://sealshare.pages.dev

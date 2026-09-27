@@ -96,7 +96,7 @@
       //   다른 주소면 그 안에서는 평범하게 돌고, 이 페이지(주소창의 열쇠)에는 여전히 못 닿는다.
       const frameOrigin = `${location.protocol}//frame.${location.host}`;
       frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads");
-      frame.setAttribute("allow", "fullscreen; clipboard-write; autoplay");
+      frame.setAttribute("allow", "fullscreen; clipboard-write; autoplay; encrypted-media; picture-in-picture"); // 유튜브 등 임베드가 쓰는 권한까지 넘긴다
       frame.setAttribute("allowfullscreen", "");
       window.addEventListener("message", function onReady(e) {
         if (e.origin !== frameOrigin || !e.data || e.data.type !== "sealshare:ready") return;
