@@ -1,5 +1,5 @@
 // POST /api/s — 암호문 한 건을 받는다. 등록된 올리는 사람(지인)만.
-import { MAX_BYTES, json, randomId, sha256hex, uploaderOf } from "../../../lib/shared.js";
+import { MAX_BYTES, json, randomId, sha256hex, touch, uploaderOf } from "../../../lib/shared.js";
 
 export async function onRequestPost({ request, env }) {
   const who = await uploaderOf(request, env);
@@ -17,5 +17,6 @@ export async function onRequestPost({ request, env }) {
     httpMetadata: { contentType: "application/octet-stream" },
     customMetadata: { owner: who.name, del: await sha256hex(deleteToken), created: new Date().toISOString() },
   });
+  await touch(env, who);
   return json({ id, deleteToken, bytes: body.byteLength }, 201);
 }

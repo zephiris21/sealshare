@@ -96,7 +96,11 @@ if (cmd === "setup") {
   console.log(`${name} 님을 명단에서 뺐습니다. 이미 만든 링크는 그대로 열립니다.`);
 } else if (cmd === "list") {
   const { people, orphan } = await api("/api/admin/people");
-  for (const p of people) console.log(`${p.name}  ${p.added?.slice(0, 10)}  공유 ${p.shares}건  ${(p.bytes / 1e6).toFixed(1)}MB`);
+  const ago = (s) => { if (!s) return "기록 없음"; const m = Math.round((Date.now() - Date.parse(s)) / 60000); return m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`; };
+  for (const p of people) {
+    const st = p.registered ? "등록함" : p.shares ? "등록함(공유 기록)" : "등록 전";
+    console.log(`${p.name}  ${st} · 마지막 사용 ${ago(p.lastSeen)} · 공유 ${p.shares}건(최근 7일 ${p.recent7}) · ${(p.bytes / 1e6).toFixed(1)}MB`);
+  }
   for (const o of orphan || []) console.log(`(뺌) ${o.name}  남은 링크 ${o.shares}건`);
   if (!people.length) console.log("아직 아무도 없습니다.");
 } else if (cmd === "migrate") {

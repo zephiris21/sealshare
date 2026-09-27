@@ -49,6 +49,24 @@ export async function uploaderOf(request, env) {
   return null;
 }
 
+/**
+ * 활동 기록 — 「등록했나 · 마지막으로 언제 썼나」만 남긴다(내용·파일 이름은 안 남긴다).
+ * 명단(people.json)과 «따로» 둔다: 한 파일을 같이 고치면 누가 쓰는 순간과 운영자가 사람을 넣는 순간이 겹칠 때
+ * 넣은 사람이 덮여 사라질 수 있다. 사람마다 한 파일(admin/seen/<해시>)이면 서로 안 부딪힌다.
+ * 쓰기를 줄이려고 마지막 기록이 10분 안이면 다시 쓰지 않는다.
+ */
+export async function touch(env, who) {
+  const key = `admin/seen/${who.hash}`;
+  const now = new Date().toISOString();
+  const cur = await env.BUCKET.get(key).then((o) => (o ? o.json() : null)).catch(() => null);
+  if (cur && Date.now() - Date.parse(cur.lastSeen) < 10 * 60 * 1000) return;
+  await env.BUCKET.put(key, JSON.stringify({ registered: cur?.registered || now, lastSeen: now }), { httpMetadata: { contentType: "application/json" } });
+}
+export async function seenOf(env, hash) {
+  const o = await env.BUCKET.get(`admin/seen/${hash}`);
+  return o ? await o.json() : null;
+}
+
 /** 운영자인가 — ADMIN_HASH(운영자 인증값의 sha256)와 맞으면 true */
 export async function isAdmin(request, env) {
   const b = bearer(request);

@@ -12,6 +12,10 @@
   const hashOfKey = async (key) => hex(await sha(b64url(await sha("sealshare/auth/v1:" + key))));
   const fmtBytes = (n) => n > 1e6 ? (n / 1e6).toFixed(1) + "MB" : n ? Math.max(1, Math.round(n / 1024)) + "KB" : "0";
   const fmtDate = (s) => s ? new Date(s).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) : "";
+  const ago = (s) => { if (!s) return "기록 없음"; const m = Math.round((Date.now() - Date.parse(s)) / 60000);
+    return m < 1 ? "방금" : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`; };
+  // 등록 여부 — 활동 기록이 생기기 전(2026-09-27 이전)에 등록한 사람은 공유 기록으로 짐작한다
+  const status = (p) => p.registered ? "등록함" : p.shares ? "등록함(공유 기록으로 확인)" : "아직 등록 안 함";
 
   function el(tag, props = {}, kids = []) {
     const e = document.createElement(tag);
@@ -50,7 +54,7 @@
         load();
       };
       box.appendChild(el("div", { class: "card" }, [
-        el("div", { class: "who" }, [el("div", { class: "name", text: p.name }), el("div", { class: "meta", text: `${fmtDate(p.added)} 추가 · 공유 ${p.shares}건 · ${fmtBytes(p.bytes)}` })]),
+        el("div", { class: "who" }, [el("div", { class: "name", text: p.name }), el("div", { class: "meta", text: `${status(p)} · 마지막 사용 ${ago(p.lastSeen)}` }), el("div", { class: "meta", text: `공유 ${p.shares}건(최근 7일 ${p.recent7}건) · ${fmtBytes(p.bytes)} · ${fmtDate(p.added)} 추가` })]),
         off,
       ]));
     }

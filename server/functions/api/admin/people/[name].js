@@ -6,7 +6,9 @@ export async function onRequestDelete({ request, params, env }) {
   const name = decodeURIComponent(params.name);
   const people = await loadPeople(env);
   if (!people[name]) return json({ ok: true, gone: true });
+  const hash = people[name].hash;
   delete people[name];
   await savePeople(env, people);
+  await env.BUCKET.delete(`admin/seen/${hash}`); // 그 사람의 활동 기록(등록·마지막 사용)도 지운다
   return json({ ok: true });
 }
