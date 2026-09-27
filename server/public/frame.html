@@ -13,11 +13,92 @@
 (function () {
   var host = location.hostname;                     // frame.sealshare.pages.dev
   var parentOrigin = "https://" + host.replace(/^frame\./, "");
+
+  // 데이터 주소(data:)는 새 탭으로 못 연다(브라우저가 막는다) — 같은 내용의 blob 주소로 바꾼다.
+  // 동기로 바꿔야 «누른 순간»의 허락이 살아 있어 사파리 팝업 차단에 안 걸린다
+  function blobUrl(dataUrl) {
+    var comma = dataUrl.indexOf(",");
+    var head = dataUrl.slice(5, comma), body = dataUrl.slice(comma + 1);
+    var type = head.split(";")[0] || "application/octet-stream";
+    var bytes;
+    if (/;base64$/i.test(head)) {
+      var bin = atob(body);
+      bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    } else bytes = new TextEncoder().encode(decodeURIComponent(body));
+    return URL.createObjectURL(new Blob([bytes], { type: type }));
+  }
+
+  // 링크 — 틀 안에서 다른 사이트로 넘어가면 보기 화면의 보안 규칙에 막혀 «문서가 통째로 빈 화면»이 된다.
+  // 그래서 밖으로 가는 링크는 새 탭으로 연다. 페이지 스스로 처리한 클릭(preventDefault)은 건드리지 않는다
+  function onClick(e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var path = e.composedPath ? e.composedPath() : [e.target], a = null;
+    for (var i = 0; i < path.length; i++) if (path[i].localName === "a" && path[i].hasAttribute && (path[i].hasAttribute("href") || path[i].hasAttribute("xlink:href"))) { a = path[i]; break; }
+    if (!a || a.hasAttribute("download")) return;
+    var raw = a.getAttribute("href") || a.getAttribute("xlink:href");
+    if (/^\s*javascript:/i.test(raw)) return;
+    if (/^\s*data:/i.test(raw)) { e.preventDefault(); window.open(blobUrl(raw.trim()), "_blank"); return; }
+    var url;
+    try { url = new URL(raw, document.baseURI); } catch (_) { return; }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return;          // mailto·tel 등은 브라우저에 맡긴다
+    var target = (a.getAttribute("target") || (document.querySelector("base[target]") || {}).target || "").toLowerCase();
+    if (url.origin === location.origin && url.pathname === location.pathname && url.search === location.search) return; // 같은 문서 안(#…)
+    if (target && target !== "_self" && target !== "_top" && target !== "_parent") return; // 새 탭 링크는 이미 된다
+    e.preventDefault();
+    if (url.origin === location.origin) return; // 같이 올라오지 않은 로컬 페이지 — 받는 쪽엔 없다. 문서가 날아가지 않게만 막는다
+    window.open(url.href, "_blank", "noopener,noreferrer");
+  }
+  function onSubmit(e) { // 밖으로 보내는 폼(검색창 등)도 같은 이유로 새 탭
+    var f = e.target;
+    try { if (f.localName === "form" && !f.getAttribute("target") && new URL(f.action, document.baseURI).origin !== location.origin) f.target = "_blank"; } catch (_) {}
+  }
+
+  // PDF — 크롬은 격리된 틀 안에서 PDF 를 안 띄우고, 폰 브라우저는 틀 속 PDF 를 원래 제대로 못 띄운다 → 「새 탭에서 열기」로 바꾼다
+  function pdfFallback() {
+    var els = document.querySelectorAll("iframe[src], embed[src], object[data]");
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i], src = el.getAttribute("src") || el.getAttribute("data") || "";
+      if (!/^data:application\/pdf/i.test(src) && !/\.pdf($|[?#])/i.test(src)) continue;
+      var a = document.createElement("a");
+      a.href = src; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = "📄 PDF 열기 — 새 탭에서 봅니다";
+      a.style.cssText = "display:flex;align-items:center;justify-content:center;box-sizing:border-box;max-width:100%;"
+        + "width:" + (el.offsetWidth || 300) + "px;height:" + (el.offsetHeight || 150) + "px;"
+        + "border:1px solid #d0d0d0;border-radius:10px;background:#f5f5f3;color:#333;font:15px/1.4 -apple-system,sans-serif;text-decoration:none";
+      el.replaceWith(a);
+    }
+  }
+
+  // 화면 색 — 페이지가 색 체계를 안 밝혔으면 «그 파일을 브라우저로 직접 연 것과 같게»(밝은 바탕) 보이게 한다.
+  //   · 받는 쪽이 다크 모드여도 보기 화면의 어두운 바탕이 비쳐 들지 않게 — 부모에게 알려 틀 바탕을 맞춘다
+  //   · 안드로이드 크롬·삼성 인터넷의 «강제 다크»가 원본 색을 뒤집지 않게 — only light
+  //   페이지가 color-scheme 이나 다크 규칙을 스스로 밝혔으면 그걸 따른다(맨 앞·0 명시도로 넣어 어떤 작성자 규칙에도 진다)
+  function colorScheme() {
+    if (!document.querySelector('meta[name="color-scheme"]')) {
+      var s = document.createElement("style");
+      s.textContent = ":where(:root){color-scheme:only light}";
+      var head = document.head || document.documentElement;
+      head.insertBefore(s, head.firstChild);
+    }
+    report();
+  }
+  function report() {
+    var cs = getComputedStyle(document.documentElement).colorScheme || "normal";
+    parent.postMessage({ type: "sealshare:scheme", scheme: cs }, parentOrigin);
+  }
+
   window.addEventListener("message", function (e) {
     if (e.origin !== parentOrigin || !e.data || e.data.type !== "sealshare:render") return;
     document.open();
     document.write(e.data.html);
     document.close();
+    // document.open 이 앞서 단 듣기를 다 지웠다 — 여기서 새로 단다
+    window.addEventListener("click", onClick);
+    window.addEventListener("submit", onSubmit);
+    pdfFallback();
+    colorScheme();
+    window.addEventListener("load", function () { pdfFallback(); report(); }); // 늦게 붙는 스타일·요소까지
   });
   parent.postMessage({ type: "sealshare:ready" }, parentOrigin);
 })();

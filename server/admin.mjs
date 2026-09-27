@@ -2,6 +2,8 @@
 // 운영자 전용 — 명단(올릴 수 있는 사람)을 관리한다. 웹 명단 페이지(/admin)와 같은 API 를 쓴다.
 //   node admin.mjs setup          처음 한 번: 운영자 열쇠를 만들고 서버에 등록(ADMIN_HASH)
 //   node admin.mjs page           명단 페이지 주소를 클립보드에 복사(운영자 열쇠가 들어 있다 — 화면에 안 찍는다)
+//   node admin.mjs invite <이름> [--replace]  초대장 링크를 만들어 클립보드에 넣는다(친구가 열어 열쇠를 직접 받는다 · 한 번만)
+//   node admin.mjs cancel <이름>   그 이름의 초대장을 지운다
 //   node admin.mjs add <이름>      친구 추가 → 열쇠 파일을 «다운로드» 폴더에 만든다(열쇠는 화면에 안 찍는다)
 //   node admin.mjs remove <이름>   명단에서 빼기(그 사람이 이미 만든 링크는 그대로 열린다)
 //   node admin.mjs list
@@ -24,23 +26,26 @@ const b64url = (b) => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_
 const sha = (s) => createHash("sha256").update(s, "utf8").digest();
 const keyHash = (key) => sha(b64url(sha("sealshare/auth/v1:" + key))).toString("hex"); // 친구 열쇠 → 서버에 두는 해시
 const adminAuthOf = (t) => b64url(sha("sealshare/admin/v1:" + t));
+const inviteHashOf = (secret) => sha(b64url(sha("sealshare/invite/v1:" + secret))).toString("hex"); // 초대장 비밀값 → 서버에 두는 해시
 
 const die = (m) => { console.error(m); process.exit(1); };
 const run = (args, input) => spawnSync("npx", args, { cwd: here, input, encoding: "utf8", shell: process.platform === "win32" });
 function adminToken() {
   try { return JSON.parse(readFileSync(ADMIN, "utf8")).token; } catch { return null; }
 }
-async function api(path, opts = {}) {
+async function api(path, opts = {}, soft = false) {
   const t = adminToken();
   if (!t) die("운영자 열쇠가 없습니다 — 먼저: node admin.mjs setup");
   const r = await fetch(SERVER + path, { ...opts, headers: { ...(opts.headers || {}), authorization: `Bearer ${adminAuthOf(t)}` } });
   const body = await r.json().catch(() => ({}));
-  if (!r.ok) die(`${r.status}: ${body.error || r.statusText}`);
-  return body;
+  if (!r.ok && !soft) die(`${r.status}: ${body.error || r.statusText}`);
+  return soft ? { status: r.status, ...body } : body;
 }
 function copy(text) {
   const [cmd, args] = process.platform === "win32" ? ["clip", []] : process.platform === "darwin" ? ["pbcopy", []] : ["xclip", ["-selection", "clipboard"]];
-  return spawnSync(cmd, args, { input: text, shell: process.platform === "win32" }).status === 0;
+  // 윈도우 clip 은 입력을 코드페이지(cp949)로 읽어 한글이 깨진다 — UTF-16LE 로 넘긴다(BOM 을 붙이면 BOM 까지 붙여 넣어진다)
+  const input = process.platform === "win32" ? Buffer.from(text, "utf16le") : text;
+  return spawnSync(cmd, args, { input, shell: process.platform === "win32" }).status === 0;
 }
 function keyFile(name, key) {
   return [
@@ -53,7 +58,7 @@ function keyFile(name, key) {
   ].join("\n");
 }
 
-const [cmd, name] = process.argv.slice(2);
+const [cmd, name, ...rest] = process.argv.slice(2);
 
 if (cmd === "setup") {
   let t = adminToken();
@@ -81,6 +86,26 @@ if (cmd === "setup") {
     : spawnSync(process.platform === "darwin" ? "open" : "xdg-open", [url]).status === 0;
   const copied = copy(url);
   console.log(`${opened ? "명단 페이지를 브라우저로 열었습니다." : "브라우저를 못 열었습니다."}${copied ? " 주소는 클립보드에도 있습니다." : ""} (운영자 열쇠가 들어 있으니 남에게 보내지 마세요)`);
+} else if (cmd === "invite") {
+  // 초대장 — 비밀값(si_…)은 여기서 만들고 서버에는 해시만 보낸다. 링크는 화면에 안 찍고 클립보드에만 넣는다
+  if (!name) die("이름을 주세요: node admin.mjs invite <이름> [--replace]");
+  const secret = "si_" + b64url(randomBytes(32));
+  const r = await api("/api/admin/invites", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, hash: inviteHashOf(secret), replace: rest.includes("--replace") }) }, true);
+  if (r.status === 409 && r.exists) die(`${name} 님은 이미 명단에 있습니다. 초대장을 받는 순간 예전 열쇠를 끄려면: node admin.mjs invite ${name} --replace`);
+  if (r.status !== 201) die(`${r.status}: ${r.error || "만들지 못했습니다"}`);
+  const until = new Date(r.expires).toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+  const msg = `sealshare 초대장이에요. 클로드 코드를 쓰는 컴퓨터에서 열어 주세요 (${until}까지, 한 번만 받을 수 있어요)\n${SERVER}/invite#${secret}`;
+  console.log(`${name} 님 초대장을 만들었습니다 (${until}까지 · 한 번만).\n` + (copy(msg)
+    ? "안내 문구와 링크를 클립보드에 넣었습니다 — 그 친구에게만 붙여 넣어 보내세요."
+    : "클립보드에 못 넣었습니다 — 명단 페이지(node admin.mjs page)에서 새로 만드세요."));
+} else if (cmd === "cancel") {
+  // 그 이름의 초대장을 지운다 — 안 받은 것은 링크가 죽고, 받은 것은 기록만 지워진다(받은 열쇠를 끊으려면 remove)
+  if (!name) die("이름을 주세요: node admin.mjs cancel <이름>");
+  const { invites } = await api("/api/admin/invites");
+  const mine = invites.filter((v) => v.name === name);
+  for (const v of mine) await api(`/api/admin/invites/${v.hash}`, { method: "DELETE" });
+  console.log(mine.length ? `${name} 님 초대장 ${mine.length}건을 지웠습니다.` : `${name} 님 초대장이 없습니다.`);
 } else if (cmd === "add") {
   if (!name) die("이름을 주세요: node admin.mjs add <이름>");
   const key = "ss_" + b64url(randomBytes(32));
@@ -103,6 +128,9 @@ if (cmd === "setup") {
   }
   for (const o of orphan || []) console.log(`(뺌) ${o.name}  남은 링크 ${o.shares}건`);
   if (!people.length) console.log("아직 아무도 없습니다.");
+  const { invites } = await api("/api/admin/invites");
+  const d = (s) => new Date(s).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
+  for (const v of invites) console.log(`✉ ${v.name}  초대장 ${v.state === "claimed" ? "받음 " + d(v.claimed) : v.state === "expired" ? "기한 지남" : "기다리는 중(" + d(v.expires) + "까지)"}${v.replace ? " · 받으면 예전 열쇠 꺼짐" : ""}`);
 } else if (cmd === "migrate") {
   // 옛 판(명단이 Pages 비밀값 UPLOADERS 에 있던 때)의 로컬 사본을 R2 명단으로 옮긴다 — 한 번만
   if (!existsSync(LEGACY)) die("옮길 옛 명단(.uploaders.json)이 없습니다.");
@@ -112,5 +140,5 @@ if (cmd === "setup") {
     console.log(`${n}: ${r.status === 201 ? "옮겼습니다" : r.status === 409 ? "이미 있습니다" : "실패 " + r.status}`);
   }
 } else {
-  console.log("쓰는 법: node admin.mjs setup | page | add <이름> | remove <이름> | list");
+  console.log("쓰는 법: node admin.mjs setup | page | invite <이름> [--replace] | cancel <이름> | add <이름> | remove <이름> | list");
 }

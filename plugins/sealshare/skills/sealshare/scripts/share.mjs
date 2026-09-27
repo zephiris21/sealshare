@@ -42,7 +42,7 @@ const HELP = `sealshare — 파일을 «서버가 못 읽는» 링크로 공유�
   「그 링크 꺼줘」                                 → 더는 안 열리게
   「공유 목록 관리 페이지 열어줘」                 → 폰·PC 브라우저에서 목록 보기·복사·끄기
 
-처음 한 번: 운영자에게 받은 열쇠 파일(sealshare-key-….env)을 «다운로드» 폴더에 두고 → 「sealshare 열쇠 등록해줘」
+처음 한 번: 초대장에서 받은 열쇠 파일(sealshare-key-….env)을 «다운로드» 폴더에 두고 → 「sealshare 열쇠 등록해줘」
 공유할 수 있는 것: .html .htm(스크립트까지 돈다) · .md .markdown .txt(깔끔한 문서로)
 알아 둘 것: 링크를 가진 사람은 누구나 봅니다(로그인 없음). 링크 없이는 서버도 못 엽니다.`;
 
@@ -68,13 +68,13 @@ const indexKeyOf = (token) => sha("sealshare/index/v1:" + token);      // 서버
 
 function needToken() {
   const c = config();
-  if (!c.token) die("아직 올리기 열쇠가 없습니다.\n운영자에게 받은 열쇠 파일(sealshare-key-….env)을 «다운로드» 폴더에 두고: 「sealshare 열쇠 등록해줘」");
+  if (!c.token) die("아직 올리기 열쇠가 없습니다.\n초대장에서 받은 열쇠 파일(sealshare-key-….env)을 «다운로드» 폴더에 두고: 「sealshare 열쇠 등록해줘」");
   return c;
 }
 
 // ── 한 파일로 묶기 ───────────────────────────────────────────────────────────
 const isLocal = (u) => u && !/^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(u.trim());
-const stats = { inlined: 0, missing: [] };
+const stats = { inlined: 0, missing: [], pages: [] };
 
 function fileFor(ref, baseDir) {
   const clean = decodeURIComponent(ref.trim().split(/[?#]/)[0]);
@@ -121,11 +121,27 @@ function bundleHtml(html, baseDir) {
   });
   html = html.replace(/<link\b[^>]*rel\s*=\s*["']?(icon|apple-touch-icon)[^>]*>/gi, (tag) =>
     tag.replace(/href\s*=\s*("([^"]*)"|'([^']*)')/i, (m, _q, a, b) => { const d = dataUri(a ?? b, baseDir); return d ? `href="${d}"` : m; }));
+  // 로컬 파일로 가는 링크(<a href="보고서.pdf">)도 안에 넣는다 — 받는 쪽에서 누르면 새 탭으로 열린다.
+  // 다른 로컬 «페이지»(.html)로 가는 링크는 넣지 않는다(이 파일 한 장만 올라간다) — 개수만 알린다
+  html = html.replace(/<a\b[^>]*>/gi, (tag) => tag.replace(/\bhref\s*=\s*("([^"]*)"|'([^']*)')/i, (m, _q, a, b) => {
+    const ref = a ?? b;
+    if (!isLocal(ref)) return m;
+    if (/\.(html?|md)($|[?#])/i.test(ref)) { stats.pages.push(ref); return m; }
+    const d = dataUri(ref, baseDir);
+    return d ? `href="${d}"` : m;
+  }));
   html = html.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (m, o, css, c) => o + inlineCssUrls(css, baseDir) + c);
   html = html.replace(/\bstyle\s*=\s*"([^"]*)"/gi, (m, css) => `style="${inlineCssUrls(css, baseDir).replace(/"/g, "'")}"`);
   return html;
 }
 function bundleMarkdown(md, baseDir) {
+  // [보고서](보고서.pdf) 같은 로컬 파일 링크 — 그림(![]) 은 아래에서 따로
+  md = md.replace(/(^|[^!])\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(\s+"[^"]*")?\s*\)/g, (m, pre, text, ref, title) => {
+    if (!isLocal(ref)) return m;
+    if (/\.(html?|md)($|[?#])/i.test(ref)) { stats.pages.push(ref); return m; }
+    const d = dataUri(ref, baseDir);
+    return d ? `${pre}[${text}](${d}${title || ""})` : m;
+  });
   md = md.replace(/!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(\s+"[^"]*")?\s*\)/g, (m, alt, ref, title) => {
     const d = dataUri(ref, baseDir);
     return d ? `![${alt}](${d}${title || ""})` : m;
@@ -222,6 +238,7 @@ async function share(file, title) {
   console.log(`\n제목   ${t}`);
   console.log(`형식   ${kind === "html" ? "HTML(스크립트 포함, 격리해서 띄움)" : "마크다운"} · 암호문 ${(blob.length / 1024).toFixed(0)}KB`);
   if (stats.inlined) console.log(`묶음   로컬 파일 ${stats.inlined}개를 안에 넣었습니다`);
+  if (stats.pages.length) console.log(`⚠ 다른 로컬 페이지로 가는 링크 ${stats.pages.length}개 — 이 파일 한 장만 올라가서 받는 쪽에서는 안 열립니다: ${[...new Set(stats.pages)].slice(0, 5).join(", ")}`);
   if (stats.missing.length) console.log(`⚠ 못 찾은 로컬 파일 ${stats.missing.length}개 — 받는 쪽에서 비어 보입니다: ${[...new Set(stats.missing)].slice(0, 5).join(", ")}${stats.missing.length > 5 ? " …" : ""}`);
   console.log(`복사   ${copied ? "클립보드에 복사했습니다" : "클립보드 복사 실패 — 위 링크를 직접 복사하세요"}`);
   console.log(`\n링크를 가진 사람은 누구나 봅니다. 끄려면: 「그 링크 꺼줘」 (node share.mjs off ${out.id})`);
@@ -281,7 +298,7 @@ function findKey(arg, file) {
     const dl = join(homedir(), "Downloads");
     const names = existsSync(dl) ? readdirSync(dl).filter((n) => /^sealshare-key.*\.(env|txt)$/i.test(n)) : [];
     const newest = names.map((n) => ({ n, t: statSync(join(dl, n)).mtimeMs })).sort((a, b) => b.t - a.t)[0];
-    if (!newest) die(`열쇠 파일을 못 찾았습니다.\n운영자에게 받은 sealshare-key-….env 를 «다운로드» 폴더(${dl})에 두고 다시 「sealshare 열쇠 등록해줘」 하세요.`);
+    if (!newest) die(`열쇠 파일을 못 찾았습니다.\n초대장에서 받은 sealshare-key-….env 를 «다운로드» 폴더(${dl})에 두고 다시 「sealshare 열쇠 등록해줘」 하세요.`);
     path = join(dl, newest.n);
   }
   if (!existsSync(path)) die(`파일이 없습니다: ${path}`);

@@ -26,6 +26,8 @@
   input { flex: 1; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
   .issued { background: var(--hi); border-radius: 14px; padding: 16px; margin-top: 12px; line-height: 1.6; }
   .issued code { display: block; margin: 8px 0; padding: 10px; border-radius: 8px; background: var(--card); word-break: break-all; font-size: 13px; }
+  .link { display: block; margin: 8px 0; padding: 10px; border-radius: 8px; background: var(--card); word-break: break-all; font-size: 12.5px; color: var(--ink2); }
+  h2 .meta { font-weight: 400; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .err { color: var(--warn); } .note { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-top: 28px; border-top: 1px solid var(--line); padding-top: 14px; }
 </style>
@@ -39,8 +41,12 @@
     <div class="row"><button id="go" class="primary">열기</button></div>
   </div>
   <div id="app" hidden>
-    <h2>친구 추가</h2>
-    <div class="add"><input id="newName" placeholder="이름 (예: 철수)" maxlength="40"><button id="addBtn" class="primary">추가</button></div>
+    <h2>초대장 보내기 <span class="meta">— 추천. 친구가 링크를 열어 열쇠를 직접 받아요(한 번만)</span></h2>
+    <div class="add"><input id="invName" placeholder="이름 (예: 철수)" maxlength="40"><button id="invBtn" class="primary">초대장 만들기</button></div>
+    <div id="invOut"></div>
+    <div id="invites"></div>
+    <h2>열쇠 파일로 직접 추가</h2>
+    <div class="add"><input id="newName" placeholder="이름 (예: 철수)" maxlength="40"><button id="addBtn">추가</button></div>
     <div id="issued"></div>
     <h2>올릴 수 있는 사람</h2>
     <div id="people"></div>

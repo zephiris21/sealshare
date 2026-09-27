@@ -15,11 +15,25 @@
   #msg { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; }
   #msg b { display: block; font-size: 20px; margin-bottom: 8px; }
   #msg span { color: #8a867f; font-size: 15px; line-height: 1.6; }
+  /* 저장 — 구석에 작게, 반투명. 내용 위에 떠 있으니 누를 때만 또렷하게 */
+  #save { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); z-index: 5;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  #save[hidden], #saveMenu[hidden] { display: none; }
+  #saveMenu { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  #save button { appearance: none; border: 0; border-radius: 99px; padding: 8px 13px; cursor: pointer;
+    font: 600 13px/1 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif;
+    background: rgba(38, 37, 33, .78); color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, .4), 0 2px 8px rgba(0, 0, 0, .25); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  #saveBtn { opacity: .5; transition: opacity .15s; }
+  #saveBtn:hover, #saveBtn:focus-visible, #save.open #saveBtn { opacity: 1; }
 </style>
 </head>
 <body>
 <div id="msg"><div><b>여는 중…</b><span>링크 안의 열쇠로 이 브라우저에서 내용을 풉니다.</span></div></div>
 <iframe id="frame" title="공유 문서"></iframe>
+<div id="save" hidden>
+  <div id="saveMenu" hidden><button data-fmt="md">마크다운 원문 (.md)</button><button data-fmt="html">웹 페이지 (.html)</button></div>
+  <button id="saveBtn" title="이 문서를 내 기기에 파일로 저장">⤓ 저장</button>
+</div>
 <script src="/vendor/marked.umd.js"></script>
 <script src="/viewer.js"></script>
 </body>

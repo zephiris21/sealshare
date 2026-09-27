@@ -7,6 +7,7 @@
 // 그래서 서버(운영자)는 열쇠 원문을 모르고, 목록 열쇠를 만들 수 없고, 남의 목록을 못 연다.
 //
 // 명단(올릴 수 있는 사람)은 R2 의 admin/people.json 에 둔다 — {이름: {hash, added}}. 운영자 페이지가 고친다.
+// 초대장은 admin/invites/<해시> 에 둔다 — 초대장 비밀값(si_…, 링크의 # 뒤)에서 뽑은 인증값의 sha256. 서버는 링크를 모른다.
 // 운영자 인증은 따로다: 운영자 열쇠에서 같은 식으로 뽑은 인증값의 sha256 을 Pages 비밀값 ADMIN_HASH 에 둔다.
 
 export const MAX_BYTES = 25 * 1024 * 1024; // 공유 한 건의 암호문 상한
@@ -14,7 +15,9 @@ export const MAX_INDEX_BYTES = 5 * 1024 * 1024; // 목록 암호문 상한
 export const ID_RE = /^[A-Za-z0-9_-]{22}$/; // 16바이트 무작위 → base64url 22자
 export const HASH_RE = /^[0-9a-f]{64}$/;
 export const NAME_RE = /^[^\s/\\]{1,40}$/u;
+export const INVITE_DAYS = 7; // 초대장 기한
 const PEOPLE = "admin/people.json";
+export const inviteKey = (hash) => `admin/invites/${hash}`;
 
 export async function sha256hex(text) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -29,6 +32,30 @@ export function randomId(bytes = 16) {
 function bearer(request) {
   const m = (request.headers.get("authorization") || "").match(/^Bearer\s+(\S+)$/i);
   return m ? m[1] : null;
+}
+
+/** Bearer 로 온 인증값의 sha256 — 없으면 null */
+export async function bearerHash(request) {
+  const b = bearer(request);
+  return b ? await sha256hex(b) : null;
+}
+
+/** 초대장 상태 — open(아직 안 받음) · claimed(받음) · expired(기한 지남) */
+export function inviteState(inv) {
+  return inv.claimed ? "claimed" : Date.now() > Date.parse(inv.expires) ? "expired" : "open";
+}
+export async function listInvites(env) {
+  const out = [];
+  let cursor;
+  do {
+    const page = await env.BUCKET.list({ prefix: "admin/invites/", cursor });
+    for (const o of page.objects) {
+      const inv = await env.BUCKET.get(o.key).then((x) => (x ? x.json() : null));
+      if (inv) out.push({ hash: o.key.slice("admin/invites/".length), ...inv, state: inviteState(inv) });
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return out;
 }
 
 export async function loadPeople(env) {
