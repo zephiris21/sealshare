@@ -5,7 +5,7 @@
 //   node share.mjs list                          → 내가 만든 링크
 //   node share.mjs off <링크|id>                 → 링크 끄기
 //   node share.mjs me                            → 내 공유 목록 관리 페이지 주소
-//   node share.mjs login <올리기 열쇠> [--server <주소>]
+//   node share.mjs login [열쇠 | --file <열쇠 파일>]   (아무것도 안 주면 «다운로드»의 sealshare-key*.txt 를 찾는다)
 //   node share.mjs whoami · help
 //
 // 암호화는 이 컴퓨터에서 한다: 내용 → gzip → AES-256-GCM(무작위 열쇠) → 서버에는 암호문만.
@@ -15,7 +15,7 @@
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { gzipSync } from "node:zlib";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -42,7 +42,7 @@ const HELP = `sealshare — 파일을 «서버가 못 읽는» 링크로 공유�
   「그 링크 꺼줘」                                 → 더는 안 열리게
   「공유 목록 관리 페이지 열어줘」                 → 폰·PC 브라우저에서 목록 보기·복사·끄기
 
-처음 한 번: 운영자에게 받은 열쇠를 등록합니다 → 「sealshare 열쇠 등록해줘: ss_…」
+처음 한 번: 운영자에게 받은 열쇠 파일(sealshare-key-….txt)을 «다운로드» 폴더에 두고 → 「sealshare 열쇠 등록해줘」
 공유할 수 있는 것: .html .htm(스크립트까지 돈다) · .md .markdown .txt(깔끔한 문서로)
 알아 둘 것: 링크를 가진 사람은 누구나 봅니다(로그인 없음). 링크 없이는 서버도 못 엽니다.`;
 
@@ -68,7 +68,7 @@ const indexKeyOf = (token) => sha("sealshare/index/v1:" + token);      // 서버
 
 function needToken() {
   const c = config();
-  if (!c.token) die("아직 올리기 열쇠가 없습니다.\n운영자에게 열쇠(ss_…)를 받은 뒤: 「sealshare 열쇠 등록해줘: ss_…」  (또는 node share.mjs login <열쇠>)");
+  if (!c.token) die("아직 올리기 열쇠가 없습니다.\n운영자에게 받은 열쇠 파일(sealshare-key-….txt)을 «다운로드» 폴더에 두고: 「sealshare 열쇠 등록해줘」");
   return c;
 }
 
@@ -271,8 +271,27 @@ function me() {
   console.log(`${copied ? "클립보드에 복사했습니다. " : ""}⚠ 이 주소에는 올리기 열쇠가 들어 있습니다 — 남에게 보내지 마세요.`);
 }
 
-async function login(token, server) {
-  if (!token) die("열쇠를 주세요: node share.mjs login <열쇠>");
+// 열쇠 찾기 — ① 직접 준 열쇠 ② --file 로 준 파일 ③ 아무것도 안 주면 «다운로드» 폴더의 sealshare-key*.txt(가장 최근)
+// 🔑 파일에서 읽으면 열쇠가 대화·화면에 한 번도 안 나온다
+function findKey(arg, file) {
+  const KEY_RE = /ss_[A-Za-z0-9_-]{40,}/;
+  if (arg && KEY_RE.test(arg)) return { token: arg.match(KEY_RE)[0], from: "직접 입력" };
+  let path = file || (arg && existsSync(arg) ? arg : null);
+  if (!path) {
+    const dl = join(homedir(), "Downloads");
+    const names = existsSync(dl) ? readdirSync(dl).filter((n) => /^sealshare-key.*\.txt$/i.test(n)) : [];
+    const newest = names.map((n) => ({ n, t: statSync(join(dl, n)).mtimeMs })).sort((a, b) => b.t - a.t)[0];
+    if (!newest) die(`열쇠 파일을 못 찾았습니다.\n운영자에게 받은 sealshare-key-….txt 를 «다운로드» 폴더(${dl})에 두고 다시 「sealshare 열쇠 등록해줘」 하세요.`);
+    path = join(dl, newest.n);
+  }
+  if (!existsSync(path)) die(`파일이 없습니다: ${path}`);
+  const m = readFileSync(path, "utf8").match(KEY_RE);
+  if (!m) die(`이 파일에서 열쇠를 못 찾았습니다: ${path}`);
+  return { token: m[0], from: path };
+}
+
+async function login(arg, server, file) {
+  const { token, from } = findKey(arg, file);
   const c = readJson(CONFIG, {});
   c.token = token.trim();
   if (server) c.server = server.replace(/\/+$/, "");
@@ -282,7 +301,8 @@ async function login(token, server) {
   if (!r.ok) die(`서버 확인에 실패했습니다 (${r.status})`);
   const { name } = await r.json();
   writeJson(CONFIG, c);
-  console.log(`등록했습니다 — ${name} 님으로 확인됐습니다.\n설정 파일: ${CONFIG}\n\n${HELP}`);
+  const fromFile = from !== "직접 입력" ? `\n열쇠 파일(${from})은 이제 지워도 됩니다.` : "";
+  console.log(`등록했습니다 — ${name} 님으로 확인됐습니다.${fromFile}\n설정 파일: ${CONFIG}\n\n${HELP}`);
 }
 
 function die(m) { console.error(m); process.exit(1); }
@@ -291,6 +311,7 @@ const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf(name); if (i < 0) return undefined; const v = argv[i + 1]; argv.splice(i, 2); return v; };
 const titleArg = flag("--title");
 const serverArg = flag("--server");
+const fileArg = flag("--file");
 const [cmd, arg] = argv;
 
 try {
@@ -298,7 +319,7 @@ try {
   else if (cmd === "list") await list();
   else if (cmd === "off") await off(arg);
   else if (cmd === "me") me();
-  else if (cmd === "login") await login(arg, serverArg);
+  else if (cmd === "login") await login(arg, serverArg, fileArg);
   else if (cmd === "whoami") { const c = config(); console.log(`서버 ${c.server}\n열쇠 ${c.token ? "있음" : "없음"}\n설정 ${CONFIG}`); }
   else console.log(HELP);
 } catch (e) {
