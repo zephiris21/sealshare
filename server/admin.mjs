@@ -43,16 +43,14 @@ function copy(text) {
   return spawnSync(cmd, args, { input: text, shell: process.platform === "win32" }).status === 0;
 }
 function keyFile(name, key) {
-  return "﻿" + [
-    `sealshare 올리기 열쇠 — ${name} 님`, "",
-    "1) 클로드 코드에 sealshare 를 설치합니다:",
-    "     claude plugin marketplace add zephiris21/sealshare",
-    "     claude plugin install sealshare@sealshare",
-    "2) 이 파일을 «다운로드» 폴더에 둔 채로 클로드 코드에 말합니다:",
-    "     sealshare 열쇠 등록해줘", "",
-    "등록이 끝나면 이 파일은 지워도 됩니다. 남에게 보내지 마세요 — 이 열쇠가 곧 허가증입니다.", "",
-    key, "",
-  ].join("\r\n");
+  return [
+    `# sealshare 올리기 열쇠 — ${name} 님`,
+    "# 이 파일을 «다운로드» 폴더에 둔 채로 클로드 코드에 「sealshare 열쇠 등록해줘」 라고 말하세요.",
+    "# 설치가 아직이면: claude plugin marketplace add zephiris21/sealshare  →  claude plugin install sealshare@sealshare",
+    "# 등록이 끝나면 이 파일은 지워도 됩니다. 남에게 보내지 마세요 — 이 열쇠가 곧 허가증입니다.",
+    `SEALSHARE_KEY=${key}`,
+    "",
+  ].join("\n");
 }
 
 const [cmd, name] = process.argv.slice(2);
@@ -89,7 +87,7 @@ if (cmd === "setup") {
   await api("/api/admin/people", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, hash: keyHash(key) }) });
   const dir = join(homedir(), "Downloads");
   mkdirSync(dir, { recursive: true });
-  const file = join(dir, `sealshare-key-${name}.txt`);
+  const file = join(dir, `sealshare-key-${name}.env`);
   writeFileSync(file, keyFile(name, key), "utf8");
   console.log(`${name} 님을 추가했습니다.\n열쇠 파일: ${file}\n→ 이 파일을 ${name} 님에게만 보내세요(설치·등록 안내가 들어 있습니다). 보낸 뒤에는 지워도 됩니다.`);
 } else if (cmd === "remove") {

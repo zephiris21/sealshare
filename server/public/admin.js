@@ -23,19 +23,13 @@
 
   function keyFile(name, key) {
     return [
-      `sealshare 올리기 열쇠 — ${name} 님`,
+      `# sealshare 올리기 열쇠 — ${name} 님`,
+      "# 이 파일을 «다운로드» 폴더에 둔 채로 클로드 코드에 「sealshare 열쇠 등록해줘」 라고 말하세요.",
+      "# 설치가 아직이면: claude plugin marketplace add zephiris21/sealshare  →  claude plugin install sealshare@sealshare",
+      "# 등록이 끝나면 이 파일은 지워도 됩니다. 남에게 보내지 마세요 — 이 열쇠가 곧 허가증입니다.",
+      `SEALSHARE_KEY=${key}`,
       "",
-      "1) 클로드 코드에 sealshare 를 설치합니다:",
-      "     claude plugin marketplace add zephiris21/sealshare",
-      "     claude plugin install sealshare@sealshare",
-      "2) 이 파일을 «다운로드» 폴더에 둔 채로 클로드 코드에 말합니다:",
-      "     sealshare 열쇠 등록해줘",
-      "",
-      "등록이 끝나면 이 파일은 지워도 됩니다. 남에게 보내지 마세요 — 이 열쇠가 곧 허가증입니다.",
-      "",
-      key,
-      "",
-    ].join("\r\n");
+    ].join("\n");
   }
 
   async function load() {
@@ -80,7 +74,7 @@
       const file = keyFile(name, key);
       const dl = el("button", { class: "primary", text: "열쇠 파일 내려받기" });
       dl.onclick = () => {
-        const a = el("a", { href: URL.createObjectURL(new Blob(["﻿" + file], { type: "text/plain;charset=utf-8" })), download: `sealshare-key-${name}.txt` });
+        const a = el("a", { href: URL.createObjectURL(new Blob([file], { type: "text/plain;charset=utf-8" })), download: `sealshare-key-${name}.env` });
         document.body.appendChild(a); a.click(); a.remove();
         dl.textContent = "내려받았어요 ✓";
       };

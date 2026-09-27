@@ -5,7 +5,7 @@
 //   node share.mjs list                          → 내가 만든 링크
 //   node share.mjs off <링크|id>                 → 링크 끄기
 //   node share.mjs me                            → 내 공유 목록 관리 페이지 주소
-//   node share.mjs login [열쇠 | --file <열쇠 파일>]   (아무것도 안 주면 «다운로드»의 sealshare-key*.txt 를 찾는다)
+//   node share.mjs login [열쇠 | --file <열쇠 파일>]   (아무것도 안 주면 «다운로드»의 sealshare-key*.env 를 찾는다)
 //   node share.mjs whoami · help
 //
 // 암호화는 이 컴퓨터에서 한다: 내용 → gzip → AES-256-GCM(무작위 열쇠) → 서버에는 암호문만.
@@ -42,7 +42,7 @@ const HELP = `sealshare — 파일을 «서버가 못 읽는» 링크로 공유�
   「그 링크 꺼줘」                                 → 더는 안 열리게
   「공유 목록 관리 페이지 열어줘」                 → 폰·PC 브라우저에서 목록 보기·복사·끄기
 
-처음 한 번: 운영자에게 받은 열쇠 파일(sealshare-key-….txt)을 «다운로드» 폴더에 두고 → 「sealshare 열쇠 등록해줘」
+처음 한 번: 운영자에게 받은 열쇠 파일(sealshare-key-….env)을 «다운로드» 폴더에 두고 → 「sealshare 열쇠 등록해줘」
 공유할 수 있는 것: .html .htm(스크립트까지 돈다) · .md .markdown .txt(깔끔한 문서로)
 알아 둘 것: 링크를 가진 사람은 누구나 봅니다(로그인 없음). 링크 없이는 서버도 못 엽니다.`;
 
@@ -58,7 +58,7 @@ function config() {
   const c = readJson(CONFIG, {});
   return {
     server: (process.env.SEALSHARE_SERVER || c.server || DEFAULT_SERVER).replace(/\/+$/, ""),
-    token: process.env.SEALSHARE_TOKEN || c.token || "",
+    token: process.env.SEALSHARE_KEY || process.env.SEALSHARE_TOKEN || c.token || "",
   };
 }
 const b64url = (buf) => Buffer.from(buf).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -68,7 +68,7 @@ const indexKeyOf = (token) => sha("sealshare/index/v1:" + token);      // 서버
 
 function needToken() {
   const c = config();
-  if (!c.token) die("아직 올리기 열쇠가 없습니다.\n운영자에게 받은 열쇠 파일(sealshare-key-….txt)을 «다운로드» 폴더에 두고: 「sealshare 열쇠 등록해줘」");
+  if (!c.token) die("아직 올리기 열쇠가 없습니다.\n운영자에게 받은 열쇠 파일(sealshare-key-….env)을 «다운로드» 폴더에 두고: 「sealshare 열쇠 등록해줘」");
   return c;
 }
 
@@ -279,9 +279,9 @@ function findKey(arg, file) {
   let path = file || (arg && existsSync(arg) ? arg : null);
   if (!path) {
     const dl = join(homedir(), "Downloads");
-    const names = existsSync(dl) ? readdirSync(dl).filter((n) => /^sealshare-key.*\.txt$/i.test(n)) : [];
+    const names = existsSync(dl) ? readdirSync(dl).filter((n) => /^sealshare-key.*\.(env|txt)$/i.test(n)) : [];
     const newest = names.map((n) => ({ n, t: statSync(join(dl, n)).mtimeMs })).sort((a, b) => b.t - a.t)[0];
-    if (!newest) die(`열쇠 파일을 못 찾았습니다.\n운영자에게 받은 sealshare-key-….txt 를 «다운로드» 폴더(${dl})에 두고 다시 「sealshare 열쇠 등록해줘」 하세요.`);
+    if (!newest) die(`열쇠 파일을 못 찾았습니다.\n운영자에게 받은 sealshare-key-….env 를 «다운로드» 폴더(${dl})에 두고 다시 「sealshare 열쇠 등록해줘」 하세요.`);
     path = join(dl, newest.n);
   }
   if (!existsSync(path)) die(`파일이 없습니다: ${path}`);

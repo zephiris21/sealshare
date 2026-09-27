@@ -1,6 +1,6 @@
 {
   "name": "sealshare",
   "description": "로컬 HTML·마크다운을 서버가 못 읽는 비공개 링크로 공유한다 (종단간 암호화 · 링크 # 뒤 열쇠)",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": { "name": "zephiris21" }
 }
