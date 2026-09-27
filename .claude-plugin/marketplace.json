@@ -1,0 +1,12 @@
+{
+  "name": "sealshare",
+  "description": "sealshare — 서버가 못 읽는 링크로 HTML·마크다운 공유",
+  "owner": { "name": "zephiris21" },
+  "plugins": [
+    {
+      "name": "sealshare",
+      "source": "./plugins/sealshare",
+      "description": "로컬 HTML·마크다운을 서버가 못 읽는 비공개 링크로 공유한다"
+    }
+  ]
+}

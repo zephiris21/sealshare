@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>내 공유 목록 · sealshare</title>
+<style>
+  :root { color-scheme: light dark; --bg:#FFFEFB; --card:#FFFFFF; --ink:#262521; --ink2:#57544D; --muted:#8a867f; --line:#ECE9E2; --btn:#F2F0E9; --warn:#B3261E; --ok:#2F6B45; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1F1E1C; --card:#2A2926; --ink:#F2F0EA; --ink2:#C9C5BC; --muted:#9A968D; --line:#34322E; --btn:#34322E; --warn:#F2B8B5; --ok:#8FCDA2; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif; word-break: keep-all; }
+  main { max-width: 720px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 24px; margin: 0; }
+  .sub { color: var(--muted); font-size: 14px; margin: 6px 0 22px; line-height: 1.6; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .title { font-size: 17px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  button, a.btn { appearance: none; border: 0; border-radius: 10px; padding: 9px 14px; font: inherit; font-size: 14px; font-weight: 600;
+    background: var(--btn); color: var(--ink); cursor: pointer; text-decoration: none; }
+  button.danger { color: var(--warn); }
+  button.danger.armed { background: var(--warn); color: var(--bg); }
+  button.done { color: var(--ok); }
+  input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
+  .note { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-top: 28px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .empty { color: var(--ink2); line-height: 1.7; }
+  .err { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+  <h1>🔒 내 공유 목록</h1>
+  <div class="sub" id="sub">여는 중…</div>
+  <div id="login" hidden>
+    <p class="empty">운영자에게 받은 <b>올리기 열쇠</b>(ss_…)를 붙여 넣으세요. 이 브라우저 밖으로 나가지 않습니다.</p>
+    <input id="tok" placeholder="ss_…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="row"><button id="go">열기</button></div>
+  </div>
+  <div id="list"></div>
+  <div class="note">
+    이 목록은 <b>이 브라우저에서만</b> 풀립니다 — 서버에는 암호문만 있고, 운영자도 읽을 수 없습니다.<br>
+    ⚠ 이 페이지 주소(# 뒤)에는 <b>올리기 열쇠</b>가 들어 있습니다. 즐겨찾기만 하고 <b>남에게 보내지 마세요.</b>
+    공유 문서 링크를 주려면 아래 「링크 복사」를 쓰세요.
+  </div>
+</main>
+<script src="/me.js"></script>
+</body>
+</html>

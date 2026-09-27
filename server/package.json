@@ -1,0 +1,12 @@
+{
+  "name": "sealshare-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler pages deploy --branch main --commit-dirty=true",
+    "dev": "wrangler pages dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.129.0"
+  }
+}
